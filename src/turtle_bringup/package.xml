@@ -3,13 +3,13 @@
 <package format="3">
   <name>turtle_bringup</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="potapov.artyom2007@mail.ru">art</maintainer>
+  <description>Patrol node</description>
+  <maintainer email="potapov.artyom2007@mail.ru">Artyom743</maintainer>
   <license>Apache-2.0</license>
 
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
-  <depend>turtlesim</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>turtlesim</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
