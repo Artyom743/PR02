@@ -50,14 +50,6 @@ ros2 run patrol patrol --ros-args -r cmd_vel:=/turtle1/cmd_vel
 ros2 topic hz /turtle1/cmd_vel --window 100
 ```
 
-### Дополнительно: Маршрут мышью (`draw_route`)
-
-Запуск графического интерфейса рисования траектории:
-
-```bash
-ros2 run patrol draw_route
-```
-
 ### Проверка сдачи (Course Kit Checker)
 
 ```bash
