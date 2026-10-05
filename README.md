@@ -19,7 +19,7 @@
 
 - `package.xml` — метаданные пакета и зависимости (`rclpy`, `geometry_msgs`, `turtlesim`).
 - `setup.py` — конфигурация установки и точка входа консольного скрипта `patrol`.
-- `patrol/patrol_node.py` — нода `PatrolNode` и чистая функция `compute_cmd_vel`.
+- `patrol/patrol.py` — нода `PatrolNode` и чистая функция `select_command`.
 - `test/test_patrol.py` — модульные тесты для чистой функции.
 
 ### Сборка и запуск
