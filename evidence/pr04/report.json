@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "practice_id": "PR04",
+  "commit": "5e31c7ed52d3b574f87c386f8fc647f27227bc9c",
+  "course_kit": {
+    "version": "v1-w04",
+    "archive_sha256": "fec6b4e886c19146078bf69fbf90a19279a4cd33f656642395350b299efeb226"
+  },
+  "commands": [
+    "colcon build --symlink-install --packages-select turtle_bringup patrol",
+    "source install/setup.bash",
+    "python3 -s -m pytest src/patrol/test",
+    "ros2 launch turtle_bringup sim.launch.py",
+    "ros2 run patrol patrol --ros-args -r cmd_vel:=/turtle1/cmd_vel",
+    "ros2 param get /patrol publish_hz",
+    "ros2 param set /patrol publish_hz 5.0",
+    "ros2 topic hz /turtle1/cmd_vel",
+    "ros2 param set /patrol publish_hz 0.0",
+    "ros2 service call /clear std_srvs/srv/Empty {}",
+    "ros2 action list -t"
+  ],
+  "tests": [
+    {
+      "name": "test_compute_cmd_vel_before_first_pose",
+      "status": "passed"
+    },
+    {
+      "name": "test_compute_cmd_vel_after_pose_default",
+      "status": "passed"
+    },
+    {
+      "name": "test_compute_cmd_vel_with_custom_params",
+      "status": "passed"
+    },
+    {
+      "name": "test_validate_parameter_publish_hz",
+      "status": "passed"
+    },
+    {
+      "name": "test_validate_parameter_linear_speed",
+      "status": "passed"
+    },
+    {
+      "name": "test_validate_parameter_turn_rate",
+      "status": "passed"
+    },
+    {
+      "name": "test_flake8",
+      "status": "passed"
+    },
+    {
+      "name": "test_pep257",
+      "status": "passed"
+    },
+    {
+      "name": "zero_publish_hz_defect_reproduced",
+      "status": "passed"
+    },
+    {
+      "name": "zero_publish_hz_rejected_and_state_preserved",
+      "status": "passed"
+    },
+    {
+      "name": "dynamic_parameter_update_proven",
+      "status": "passed"
+    }
+  ],
+  "defect": {
+    "reproducer": "При отключенной валидации попытка установки ros2 param set /patrol publish_hz 0.0 приводит к ZeroDivisionError: float division by zero при расчете периода таймера (1.0 / publish_hz). Нода аварийно падает либо теряет таймер управления.",
+    "root_cause": "Период таймера вычисляется как величина, обратная частоте (1.0 / publish_hz). Частота 0.0, отрицательные числа или нечисловые значения (NaN, Inf) являются недопустимыми аргументами для создания таймера в rclpy.",
+    "proof_after": "Реализован колбэк add_on_set_parameters_callback с предварительной валидацией всех предлагаемых параметров до изменения состояния ноды. Запрос ros2 param set /patrol publish_hz 0.0 отклоняется (successful=False, reason='publish_hz must be between 1.0 and 30.0'). Прежнее значение 5.0 Гц и работа таймера сохраняются без сбоев."
+  },
+  "claims": {
+    "public_tests_passed": true,
+    "defect_reproduced": true,
+    "defect_fixed": true
+  },
+  "time": {
+    "contact_academic_hours": 2,
+    "self_study_hours": 2
+  },
+  "ai_used": true
+}
