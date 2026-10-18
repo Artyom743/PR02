@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "practice_id": "PR05",
+  "commit": "9d55e74d08e0d36f2930879a2c369317472b83ce",
+  "course_kit": {
+    "version": "v1-w06",
+    "archive_sha256": "6eda53e1c566f7f0a7e09d7afe1e5a6f3b98397175a7e57dede9a84c6d14d0fe"
+  },
+  "commands": [
+    "colcon build --symlink-install --packages-select patrol course_bringup",
+    "source install/setup.bash",
+    "python3 -s -m pytest src/patrol/test",
+    "ros2 launch course_bringup patrol.launch.py namespace:=robot_a subscriber_reliability:=reliable record:=false",
+    "timeout 3s ros2 topic echo /robot_a/sensor_pose --qos-reliability reliable --once",
+    "ros2 launch course_bringup patrol.launch.py namespace:=robot_a subscriber_reliability:=best_effort record:=false",
+    "timeout 3s ros2 topic echo /robot_a/sensor_pose --qos-reliability best_effort --once",
+    "ros2 bag record -s mcap -o evidence/pr05/bag --topics /robot_a/sensor_pose",
+    "ros2 bag info evidence/pr05/bag -s mcap",
+    "ros2 bag play evidence/pr05/bag -s mcap --qos-profile-overrides-path config/qos-overrides.yaml"
+  ],
+  "tests": [
+    {
+      "name": "public_tests_passed",
+      "status": "passed"
+    },
+    {
+      "name": "qos_incompatibility_reproduced",
+      "status": "passed"
+    },
+    {
+      "name": "qos_compatibility_restored",
+      "status": "passed"
+    },
+    {
+      "name": "bag_recorded_and_replayed",
+      "status": "passed"
+    }
+  ],
+  "defect": {
+    "reproducer": "При запуске системы с reliable-подписчиком (subscriber_reliability:=reliable) против best_effort-издателя (pose_relay) топик /robot_a/sensor_pose виден в списке, но сообщения не доставляются. Команда ros2 topic echo с флагом --qos-reliability reliable завершается по таймауту, так как издатель best effort не может обслужить reliable-подписчика.",
+    "root_cause": "Несовместимость профилей QoS: издатель предлагает BEST_EFFORT, а подписчик запрашивает RELIABLE. В ROS 2 такие профили считаются несовместимыми, и доставка данных блокируется на уровне DDS, хотя сам топик зарегистрирован в графе.",
+    "proof_after": "Профиль подписчика изменён на best_effort (subscriber_reliability:=best_effort). В живом потоке сообщения успешно принимаются. Запись в MCAP воспроизводится с применением config/qos-overrides.yaml, который принудительно задаёт reliability: best_effort, что обеспечивает совместимость и при replay."
+  },
+  "claims": {
+    "public_tests_passed": true,
+    "defect_reproduced": true,
+    "defect_fixed": true,
+    "replay_verified": true
+  },
+  "time": {
+    "contact_academic_hours": 2,
+    "self_study_hours": 2
+  },
+  "ai_used": true
+}
