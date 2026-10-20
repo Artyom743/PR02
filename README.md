@@ -2,71 +2,98 @@
 
 Репозиторий практических работ по курсу робототехники (НГУ).
 
----
-
-## ПР05. Launch, QoS и повтор записи
+## ПР06. Модель робота, tf2 и QoS преобразований
 
 ### Цель работы
-Сборка всей системы одной launch-командой с аргументами и пространством имён (`namespace`). Запись потока данных в формат MCAP. Демонстрация несовместимости профилей QoS на живом потоке (best_effort-издатель и reliable-подписчик) и её исправление. Проверка восстановленной совместимости как на живом потоке, так и на повторе записи (replay) с использованием QoS override.
+
+Собрать параметризованную модель Ackermann-робота в URDF/Xacro, связать корпус, камеру, лидар и IMU в одном дереве tf2, показать на `/tf_static`, как durability решает, увидит ли поздний подписчик преобразования, и доказать корректность геометрии и описания структурными проверками.
 
 ---
 
-### Порядок локального воспроизведения ПР05
+### Порядок локального воспроизведения ПР06
 
-#### 1. Сборка пакетов
+#### 1. Сборка пакетов и запуск тестов
+
 ```bash
 source /opt/ros/jazzy/setup.bash
-colcon build --symlink-install --packages-select patrol course_bringup
-source install/setup.bash  
-```
+colcon build --symlink-install --packages-select course_description
+source install/setup.bash
+``` 
 
-#### 2. Запуск тестов
-```bash
-python3 -m pytest src/patrol/test
-```  
+#### 2. Запуск модели и проверка QoS (Стадия 1)  
 
-#### 3. Воспроизведение сбоя QoS (Стадия 2)  
-Для того чтобы увидеть сбой, нужно запустить систему в пространстве имён /robot_a, где издатель (pose_relay) публикует данные с профилем best_effort, а подписчик (проверка через CLI) пытается слушать их с профилем reliable.  
-```bash
+Запускаем robot_state_publisher и RViz, чтобы развернуть Xacro в URDF и проверить статические преобразования.
+
+```bash  
 export ROS_DOMAIN_ID=16
 
-# В терминале 1: запуск системы со сломанным QoS (reliable-подписчик)
-ros2 launch course_bringup patrol.launch.py namespace:=robot_a subscriber_reliability:=reliable record:=false
+# В терминале 1: запуск отображения робота
+ros2 launch course_description display.launch.py  
+``` 
 
-# В терминале 2: ожидаемый таймаут (сообщения не приходят)
-timeout 3s ros2 topic echo /robot_a/sensor_pose --qos-reliability reliable --once > evidence/pr05/qos-before.txt  
+В открывшемся RViz: смени Fixed Frame на base_link, нажми Add и добавь RobotModel.
+
+```bash 
+# В терминале 2: сохранение доказательств работы QoS
+mkdir -p evidence/pr06
+{
+  echo '## topic info /tf_static'
+  ros2 topic info /tf_static --verbose
+  echo '## echo transient_local'
+  timeout 4 ros2 topic echo /tf_static --once \
+    --qos-durability transient_local --qos-reliability reliable; echo "exit=$?"
+  echo '## echo volatile'
+  timeout 4 ros2 topic echo /tf_static --once \
+    --qos-durability volatile --qos-reliability reliable; echo "exit=$?"
+} > evidence/pr06/tf-qos.txt 2>&1  
+``` 
+
+Ожидаемый результат: первая подписка (transient_local) печатает преобразования и завершается с exit=0, вторая (volatile) ничего не получает и завершается с exit=124. В конец файла tf-qos.txt необходимо дописать текстовое объяснение разницы между /tf и /tf_static.
+
+#### 3. Воспроизведение сбоя геометрии (Стадия 2 — «Сломать»)  
+
+Нужно сломать дерево связей: сделать camera_link родителем lidar_link вместо base_link в файле vehicle.urdf.xacro, сохранив прежний offset.
+
+```bash
+# Пересборка после поломки
+colcon build --symlink-install --packages-select course_description
+source install/setup.bash
+
+# В терминале 1: перезапуск системы со сломанной моделью
+ros2 launch course_description display.launch.py
+
+# В терминале 2: сохранение доказательства неверного положения
+echo "=== ДО ИСПРАВЛЕНИЯ (СЛОМАНО) ===" > evidence/pr06/model-check.txt
+timeout 3s ros2 run tf2_ros tf2_echo base_link lidar_link >> evidence/pr06/model-check.txt
 ```
-Ожидаемый результат: команда ros2 topic echo завершится по таймауту (через 3 секунды), файл qos-before.txt останется пустым. Это доказательство того, что несовместимые профили QoS блокируют доставку, хотя сам топик виден в ros2 topic list.  
-  
-#### 4. Запись исправленного потока (Стадия 3)  
-Теперь нужно перезапустить систему с совместимым профилем (best_effort), проверить, что данные идут, и записать их в файл формата MCAP.  
-```bash  
-# В терминале 1: перезапуск с совместимым QoS
-ros2 launch course_bringup patrol.launch.py namespace:=robot_a subscriber_reliability:=best_effort record:=false
 
-# В терминале 2: проверка живого потока и запись доказательства
-timeout 3s ros2 topic echo /robot_a/sensor_pose --qos-reliability best_effort --once > evidence/pr05/qos-after.txt
+Ожидаемый результат: координаты лидара изменятся с [0.0, 0.0, 0.1] на [0.25, 0.0, 0.15] (он «улетит» вперед и вверх), что доказывает неверное положение сенсора.  
 
-# Запись потока в MCAP (остановить через Ctrl+C после появления первых сообщений)
-ros2 bag record -s mcap -o evidence/pr05/bag --topics /robot_a/sensor_pose
+#### 4. Восстановление связей (Стадия 3 — «Доказать»)  
 
-# Информация о bag-файле и копирование метаданных
-ros2 bag info evidence/pr05/bag -s mcap >> evidence/pr05/qos-after.txt
-cp evidence/pr05/bag/metadata.yaml evidence/pr05/bag-metadata.yaml  
-```  
+Возвращаем base_link в качестве родителя для lidar_link и проверяем, что геометрия восстановлена.
 
-#### 5. Проверка повтора записи (Replay)  
-Чтобы доказать, что запись воспроизводится корректно с тем же профилем QoS, используется файл config/qos-overrides.yaml. Убедись, что он существует и содержит правильные настройки.  
-```bash  
-# В терминале 1: запуск реплея с применением QoS override
-ros2 bag play evidence/pr05/bag -s mcap --qos-profile-overrides-path config/qos-overrides.yaml
+```bash
+# Пересборка после починки
+colcon build --symlink-install --packages-select course_description
+source install/setup.bash
 
-# В терминале 2: проверка доставки сообщений из записи
-timeout 3s ros2 topic echo /robot_a/sensor_pose --qos-reliability best_effort --once  
-```  
+# В терминале 1: перезапуск исправленной системы
+ros2 launch course_description display.launch.py
+
+# В терминале 2: проверка корректных координат и структуры URDF
+echo -e "\n=== ПОСЛЕ ИСПРАВЛЕНИЯ (ПРАВИЛЬНО) ===" >> evidence/pr06/model-check.txt
+timeout 3s ros2 run tf2_ros tf2_echo base_link lidar_link >> evidence/pr06/model-check.txt
+
+xacro src/course_description/urdf/vehicle.urdf.xacro > /tmp/vehicle.urdf
+check_urdf /tmp/vehicle.urdf >> evidence/pr06/model-check.txt
+```
+
+Ожидаемый результат: команда tf2_echo снова показывает правильные координаты [0.0, 0.0, 0.1], а check_urdf подтверждает, что дерево связно, и base_link имеет 7 дочерних узлов.  
 
 ### Автоматическая проверка  
+
 ```bash
-python3 .course-kit/v1/tools/check_practice.py PR05 --submission .
+python3 .course-kit/v1/tools/check_practice.py PR06 --submission .
 ```
 

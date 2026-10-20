@@ -6,9 +6,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: osrf/ros:jazzy-desktop-full@sha256:d16957210572c5f919f3f9bd2fb0cc24a82542647489d8b8eda7c3beda31305f
+      # Используем образ Lyrical согласно свежей документации
+      image: osrf/ros:lyrical-desktop-full@sha256:e6b1cb530b65588279681db53784e264ce5cf83f2cc33e689d27d6024d7f3ebe
     steps:
-      - name: Prepare Node for checkout
+      # Подготовка Node (нужно для GitVerse, на GitHub не помешает)
+      - name: Prepare Node for checkout (GitVerse, linux-x64)
         shell: bash
         run: |
           test "$(uname -m)" = x86_64
@@ -21,32 +23,41 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0 # Обязательно для check_practice.py (сравнение коммитов)
 
+      # Сборка и проверка структуры пакета ПР06
       - name: Build and test
         shell: bash
         run: |
-          source /opt/ros/jazzy/setup.bash
-          colcon build --symlink-install --packages-select patrol course_bringup
+          source /opt/ros/lyrical/setup.bash
+          # Собираем пакет описания
+          colcon build --symlink-install --packages-select course_description
           source install/setup.bash
-          # Проверяем, что launch-файл установился корректно
-          test -f "$(ros2 pkg prefix course_bringup)/share/course_bringup/launch/patrol.launch.py"
-          python3 -m py_compile src/course_bringup/launch/patrol.launch.py
-          # Запускаем тесты
-          colcon test --event-handlers console_direct+ --packages-select patrol
+          
+          # Проверяем, что launch-файл и urdf установились
+          test -f "$(ros2 pkg prefix course_description)/share/course_description/launch/display.launch.py"
+          test -f "$(ros2 pkg prefix course_description)/share/course_description/urdf/vehicle.urdf.xacro"
+          
+          # Проверяем, что Xacro разворачивается без ошибок (синтаксис)
+          xacro src/course_description/urdf/vehicle.urdf.xacro > /tmp/vehicle.urdf
+          
+          # Запускаем тесты (если ты их писал)
+          colcon test --event-handlers console_direct+ --packages-select course_description
           colcon test-result --verbose
 
+      # Скачивание course-kit (используем данные из ответа API для w06)
       - name: Download course kit
         shell: bash
         env:
-          COURSE_KIT_URL: https://ros.lms.ci.nsu.ru/downloads/robotics-course-kit-v1-w06-6eda53e1c566.tar.gz
-          COURSE_KIT_SHA256: 6eda53e1c566f7f0a7e09d7afe1e5a6f3b98397175a7e57dede9a84c6d14d0fe
+          COURSE_KIT_URL: https://ros.lms.ci.nsu.ru/downloads/robotics-course-kit-v1-w07-001f7ec79674.tar.gz
+          COURSE_KIT_SHA256: 001f7ec79674d09a0f7eff2ad0935f58c95101b0cf200425c368f41579d6a31c
         run: |
           curl -fsSLo course-kit.tar.gz "$COURSE_KIT_URL"
           printf '%s  %s\n' "$COURSE_KIT_SHA256" course-kit.tar.gz | sha256sum -c -
           mkdir -p .course-kit
           tar -xzf course-kit.tar.gz -C .course-kit
 
-      - name: Check PR05 evidence
+      # Запуск официальной автопроверки для ПР06
+      - name: Check PR06 evidence
         shell: bash
-        run: python3 .course-kit/v1/tools/check_practice.py PR05 --submission .
+        run: python3 .course-kit/v1/tools/check_practice.py PR06 --submission .
