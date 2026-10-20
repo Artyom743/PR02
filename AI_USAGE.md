@@ -3,5 +3,5 @@
 - **Использован ИИ:** да
 - **Модель и версия:** DeepSeek 
 - **Среда или интерфейс агента:** веб-чат DeepSeek
-- **Затронутые компоненты:** документация (`README.md`), форматирование и оформление (`evidence/pr05/report.json`,`AI_USAGE.md`), программы (`pose_relay.py`, `patrol.launch.py`).
+- **Затронутые компоненты:** документация (`README.md`), форматирование и оформление (`evidence/pr05/report.json`,`AI_USAGE.md`), программы (`vehicle.urdf.xacro`, `display.launch.py`).
 

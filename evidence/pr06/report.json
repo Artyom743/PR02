@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "practice_id": "PR06",
+  "commit": "6d4e738b8c1c112e21884382b9b57aef43ca65db",
+  "course_kit": {
+    "version": "v1-w07",
+    "archive_sha256": "001f7ec79674d09a0f7eff2ad0935f58c95101b0cf200425c368f41579d6a31c"
+  },
+  "commands": [
+    "colcon build --symlink-install --packages-select course_description",
+    "source install/setup.bash",
+    "ros2 launch course_description display.launch.py",
+    "ros2 topic info /tf_static --verbose",
+    "timeout 4 ros2 topic echo /tf_static --once --qos-durability transient_local --qos-reliability reliable",
+    "timeout 4 ros2 topic echo /tf_static --once --qos-durability volatile --qos-reliability reliable",
+    "ros2 run tf2_ros tf2_echo base_link lidar_link",
+    "xacro src/course_description/urdf/vehicle.urdf.xacro > /tmp/vehicle.urdf",
+    "check_urdf /tmp/vehicle.urdf",
+    "python3 .course-kit/v1/tools/check_practice.py PR06 --submission ."
+  ],
+  "tests": [
+    {
+      "name": "public_tests_passed",
+      "status": "passed"
+    },
+    {
+      "name": "tf_static_qos_verified",
+      "status": "passed"
+    },
+    {
+      "name": "tf_static_volatile_timeout",
+      "status": "passed"
+    },
+    {
+      "name": "urdf_tree_structure_valid",
+      "status": "passed"
+    },
+    {
+      "name": "tf_geometry_defect_reproduced_and_fixed",
+      "status": "passed"
+    }
+  ],
+  "defect": {
+    "reproducer": "При изменении родителя (parent) для lidar_joint с base_link на camera_link (при сохранении прежнего offset) координаты лидара изменились с [0.0, 0.0, 0.1] на [0.25, 0.0, 0.15]. Команда tf2_echo base_link lidar_link показывает неверное положение сенсора.",
+    "root_cause": "Узел lidar_joint был привязан к camera_link вместо base_link. Так как camera_link имеет собственное смещение относительно корпуса робота, координаты лидара начали рассчитываться относительно камеры, что привело к искажению геометрии модели.",
+    "proof_after": "Связь восстановлена (parent=base_link). Команда tf2_echo снова показывает корректные координаты [0.0, 0.0, 0.1]. Проверка check_urdf подтверждает, что дерево связно, а base_link имеет 7 дочерних узлов."
+  },
+  "claims": {
+    "public_tests_passed": true,
+    "defect_reproduced": true,
+    "defect_fixed": true
+  },
+  "time": {
+    "contact_academic_hours": 2,
+    "self_study_hours": 2
+  },
+  "ai_used": true
+}
